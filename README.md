@@ -26,7 +26,7 @@ The sender is rejected when it:
 2. Starts with an entry in `startsWith`
 3. Ends with an entry in `endsWith`
 
-Matching is case-sensitive. A rejected message receives `Still sending spam mails? Pathetic...`; other messages are forwarded to `FORWARD_EMAIL`.
+Matching is lowercase-only. A rejected message receives `Still sending spam mails? Pathetic...`; other messages are forwarded to `FORWARD_EMAIL`.
 
 ## Requirements
 
