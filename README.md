@@ -1,18 +1,20 @@
 # Anti-Spam Mail
 
-A customizable blacklist Worker for [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/). The Worker rejects mail from exact blocked addresses or sender addresses with configured prefixes or suffixes, and forwards all remaining mail to a destination address.
+A customizable mesugaki-style blacklist Worker for [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/). The Worker rejects mail from exact blocked addresses or sender addresses matching configured prefixes or suffixes defined in a JSON file, and forwards all remaining mail to a destination address.
 
 ## Features
 
-- Block an exact sender address
-- Block addresses that start with a specified string
-- Block addresses that end with a specified string
-- Return a custom rejection message
-- Forward allowed mail to a configured address
+- Externalized filtering rules in `blocklist.json`
+- Block exact sender addresses
+- Block addresses starting with specified prefixes
+- Block addresses ending with specified suffixes
+- Case-insensitive sender matching
+- Return a custom SMTP rejection message
+- Forward allowed mail to a configured destination address
 
 ## How it works
 
-The filtering rules are defined in [`index.js`](index.js):
+The filtering rules are defined in [`blocklist.json`](blocklist.json) and bundled into [`index.js`](index.js) at build/deploy time:
 
 | Rule | Default examples |
 | --- | --- |
@@ -20,19 +22,21 @@ The filtering rules are defined in [`index.js`](index.js):
 | `startsWith` | `careless`, `market` |
 | `endsWith` | `mcpcnserver.com` |
 
-The sender is rejected when it:
+When an email arrives, the Worker normalizes `message.from` to lowercase and rejects the sender if it:
 
 1. Exactly matches an entry in `blackList`
 2. Starts with an entry in `startsWith`
 3. Ends with an entry in `endsWith`
 
-Matching is lowercase-only. A rejected message receives `Still sending spam mails? Pathetic...`; other messages are forwarded to `FORWARD_EMAIL`.
+> **Note:** Because incoming sender addresses are converted to lowercase before comparison, all entries in `blocklist.json` must be written in lowercase.
+
+Rejected messages receive the error `Still sending spam mails? Pathetic...`; all other messages are forwarded to `FORWARD_EMAIL`.
 
 ## Requirements
 
 - A Cloudflare account with Email Routing enabled for a zone
 - A verified destination email address
-- Node.js and npm for installing/running Wrangler
+- Node.js and npm for installing and running Wrangler
 - A custom domain managed by Cloudflare
 
 ## Configuration
@@ -45,10 +49,10 @@ Add `FORWARD_EMAIL` to the Worker through the Cloudflare dashboard:
 2. Select `anti-spam-mail`.
 3. Open **Settings > Variables and Secrets**.
 4. Add a text variable named `FORWARD_EMAIL`.
-5. Set its value to the verified destination email address.
+5. Set its value to your verified destination email address.
 6. Save and deploy the Worker.
 
-You can also add the variable in [`wrangler.jsonc`](/home/niugnep/Projects/anti-spam-mail/wrangler.jsonc):
+Alternatively, you can define the variable in [`wrangler.jsonc`](wrangler.jsonc):
 
 ```jsonc
 {
@@ -61,28 +65,28 @@ You can also add the variable in [`wrangler.jsonc`](/home/niugnep/Projects/anti-
 }
 ```
 
-Do not commit a real forwarding address if the repository is public.
+Do not commit a real forwarding address if your repository is public.
 
 ### 2. Customize the rules
 
-Edit the arrays near the top of [`index.js`](/home/niugnep/Projects/anti-spam-mail/index.js):
+Edit [`blocklist.json`](blocklist.json) with your desired lowercase rules:
 
-```js
-const blackList = [
-  "blocked@example.com"
-];
-
-const startsWith = [
-  "newsletter",
-  "offer"
-];
-
-const endsWith = [
-  "example.invalid"
-];
+```json
+{
+  "blackList": [
+    "blocked@example.com"
+  ],
+  "startsWith": [
+    "newsletter",
+    "offer"
+  ],
+  "endsWith": [
+    "example.invalid"
+  ]
+}
 ```
 
-After editing, deploy the updated Worker.
+After editing `blocklist.json`, redeploy the Worker so Cloudflare bundles the updated rules.
 
 ## Deployment
 
@@ -93,7 +97,7 @@ npx wrangler login
 npx wrangler deploy
 ```
 
-Alternatively, import or upload this repository in Cloudflare and deploy `index.js` as a Worker.
+Alternatively, import or upload this repository in the Cloudflare dashboard and deploy `index.js` along with `blocklist.json`.
 
 ## Connect Email Routing
 
@@ -102,26 +106,27 @@ Alternatively, import or upload this repository in Cloudflare and deploy `index.
 3. Create or edit a catch-all route.
 4. Set the action to **Send to a Worker**.
 5. Select `anti-spam-mail`.
-6. Save the route and test it with an allowed and a blocked sender address.
+6. Save the route and test it with both an allowed and a blocked sender address.
 
 ## Local development
 
-There is no separate local test suite or local Email Routing emulator in this repository. You can validate JavaScript syntax with Node.js:
+There is no separate local test suite or Email Routing emulator in this repository. Before deploying, you can validate the JavaScript and JSON syntax locally with Node.js:
 
 ```bash
-node --check index.js
+node --check index.js && node -e "JSON.parse(require('fs').readFileSync('blocklist.json', 'utf8'))"
 ```
 
-Deploy and test end-to-end through Cloudflare Email Routing for meaningful verification.
+Deploy and test end-to-end through Cloudflare Email Routing for full verification.
 
 ## Security
 
-- The exact blacklist is intended for known sender addresses and is not a replacement for SPF, DKIM, or DMARC filtering.
-- Prefix and suffix matching can block legitimate addresses; review the entries carefully.
-- Use Email Routing's destination verification and Cloudflare security controls to reduce configuration and account risk.
+- The blacklist is intended for filtering known unwanted senders and is not a replacement for SPF, DKIM, or DMARC authentication.
+- Prefix and suffix matching can inadvertently block legitimate addresses; review entries in `blocklist.json` carefully.
+- Use Email Routing's destination verification and Cloudflare's security controls to minimize configuration and account risks.
 
 ## AI usage
-This README.md was almost entirely generated by AI (GitHub Copilot in VS Code), but it has undergone human review.
+
+This `README.md` was drafted and updated with AI assistance (GitHub Copilot and Gemini), and has undergone human review.
 
 ## License
 
