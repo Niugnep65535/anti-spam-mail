@@ -1,0 +1,12 @@
+{
+  "blackList": [
+    "devnull@niugnep.idv.tw"
+  ],
+  "startsWith": [
+    "careless",
+    "market"
+  ],
+  "endsWith": [
+    "mcpcnserver.com"
+  ]
+}
